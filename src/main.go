@@ -4,18 +4,22 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/mattn/go-runewidth"
 	"github.com/nsf/termbox-go"
 )
 
+var mode int
 var ROWS, COLS int
 var offsetX, offsetY int
+var currentRow, currentCol int
 var source_file string
-var text_buffer = [][]rune{
-	// {'m', 'o', 'n', 'k', 'e', 'y'},
-	// {'e', 'd', 'i', 't', 'o', 'r'},
-}
+var text_buffer = [][]rune{}
+var undo_buffer = [][]rune{}
+var copy_buffer = []rune{}
+var modified bool
 
 func read_file(filename string) {
 	file, err := os.Open(filename)
@@ -66,6 +70,40 @@ func display_text_buffer() {
 	}
 }
 
+func display_status_bar() {
+	var mode_status string
+	var file_status string
+	var copy_status string
+	var undo_status string
+	var cursor_status string
+	if mode > 0 {
+		mode_status = " EDIT: "
+	} else {
+		mode_status = " VIEW: "
+	}
+	filename_length := len(source_file)
+	if filename_length > 8 {
+		filename_length = 8
+	}
+	file_status = source_file[:filename_length] + " - " + strconv.Itoa(len(text_buffer)) + " lines"
+	if modified {
+		file_status += " modified"
+	} else {
+		file_status += " saved"
+	}
+	cursor_status = " Row " + strconv.Itoa(currentRow+1) + ", Col " + strconv.Itoa(currentCol+1) + " "
+	if len(copy_buffer) > 0 {
+		copy_status = " [Copy]"
+	}
+	if len(undo_buffer) > 0 {
+		undo_status = " [Undo]"
+	}
+	used_space := len(mode_status) + len(file_status) + len(cursor_status) + len(copy_status) + len(undo_status)
+	spaces := strings.Repeat(" ", COLS-used_space)
+	message := mode_status + file_status + copy_status + undo_status + spaces + cursor_status
+	print_message(0, ROWS, termbox.ColorBlack, termbox.ColorWhite, message)
+}
+
 func print_message(col, row int, fg, bg termbox.Attribute, message string) {
 	for _, char := range message {
 		termbox.SetCell(col, row, char, fg, bg)
@@ -102,6 +140,7 @@ func run_editor() {
 		}
 		termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 		display_text_buffer()
+		display_status_bar()
 		termbox.Flush()
 		event := termbox.PollEvent()
 		if event.Type == termbox.EventKey && event.Key == termbox.KeyEsc {
