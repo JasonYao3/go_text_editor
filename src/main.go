@@ -13,8 +13,8 @@ import (
 
 var mode int
 var ROWS, COLS int
-var offsetX, offsetY int
-var currentRow, currentCol int
+var offset_col, offset_row int
+var current_row, current_col int
 var source_file string
 var text_buffer = [][]rune{}
 var undo_buffer = [][]rune{}
@@ -49,12 +49,27 @@ func read_file(filename string) {
 	}
 }
 
+func scroll_text_buffer() {
+	if current_row < offset_row {
+		offset_row = current_row
+	}
+	if current_col < offset_col {
+		offset_col = current_col
+	}
+	if current_row >= offset_row+ROWS {
+		offset_row = current_row - ROWS + 1
+	}
+	if current_col >= offset_col+COLS {
+		offset_col = current_col - COLS + 1
+	}
+}
+
 func display_text_buffer() {
 	var row, col int
 	for row = 0; row < ROWS; row++ {
-		text_bufferRow := row + offsetY
+		text_bufferRow := row + offset_row
 		for col = 0; col < COLS; col++ {
-			text_bufferCol := col + offsetX
+			text_bufferCol := col + offset_col
 			if text_bufferRow >= 0 && text_bufferRow < len(text_buffer) &&
 				text_bufferCol < len(text_buffer[text_bufferRow]) {
 				if text_buffer[text_bufferRow][text_bufferCol] != '\t' {
@@ -62,7 +77,7 @@ func display_text_buffer() {
 				} else {
 					termbox.SetCell(col, row, rune(' '), termbox.ColorDefault, termbox.ColorGreen)
 				}
-			} else if row+offsetY > len(text_buffer) {
+			} else if row+offset_row > len(text_buffer) {
 				termbox.SetCell(0, row, rune('*'), termbox.ColorBlue, termbox.ColorDefault)
 			}
 		}
@@ -91,7 +106,7 @@ func display_status_bar() {
 	} else {
 		file_status += " saved"
 	}
-	cursor_status = " Row " + strconv.Itoa(currentRow+1) + ", Col " + strconv.Itoa(currentCol+1) + " "
+	cursor_status = " Row " + strconv.Itoa(current_row+1) + ", Col " + strconv.Itoa(current_col+1) + " "
 	if len(copy_buffer) > 0 {
 		copy_status = " [Copy]"
 	}
@@ -111,6 +126,67 @@ func print_message(col, row int, fg, bg termbox.Attribute, message string) {
 	}
 }
 
+func get_key() termbox.Event {
+	var key_event termbox.Event
+	switch event := termbox.PollEvent(); event.Type {
+	case termbox.EventKey:
+		key_event = event
+	case termbox.EventError:
+		panic(event.Err)
+	}
+	return key_event
+}
+
+func process_keypress() {
+	key_event := get_key()
+	if key_event.Key == termbox.KeyEsc {
+		termbox.Close()
+		os.Exit(0)
+	} else if key_event.Ch != 0 {
+		// handle chars
+	} else {
+		switch key_event.Key {
+		case termbox.KeyHome:
+			current_col = 0
+		case termbox.KeyEnd:
+			current_col = len(text_buffer[current_row])
+		case termbox.KeyPgup:
+			if current_row-int(ROWS/4) > 0 {
+				current_row -= int(ROWS / 4)
+			}
+		case termbox.KeyPgdn:
+			if current_row+int(ROWS/4) < len(text_buffer)+1 {
+				current_row += int(ROWS / 4)
+			}
+		case termbox.KeyArrowUp:
+			if current_row != 0 {
+				current_row--
+			}
+		case termbox.KeyArrowDown:
+			if current_row < len(text_buffer)-1 {
+				current_row++
+			}
+		case termbox.KeyArrowLeft:
+			if current_col != 0 {
+				current_col--
+			} else if current_row > 0 {
+				current_row--
+				current_col = len(text_buffer[current_row])
+			}
+		case termbox.KeyArrowRight:
+			if current_col < len(text_buffer[current_row]) {
+				current_col++
+			} else if current_row < len(text_buffer)-1 {
+				current_row++
+				current_col = 0
+			}
+		}
+		if current_col > len(text_buffer[current_row]) {
+			current_col = len(text_buffer[current_row])
+		}
+	}
+}
+
 func run_editor() {
 	err := termbox.Init()
 	if err != nil {
@@ -126,27 +202,18 @@ func run_editor() {
 	}
 
 	for {
-		// print_message(
-		// 	25,
-		// 	11,
-		// 	termbox.ColorDefault,
-		// 	termbox.ColorDefault,
-		// 	"Monkey - A bare bones text editor",
-		// )
 		COLS, ROWS = termbox.Size()
 		ROWS--
 		if COLS < 80 {
 			COLS = 80
 		}
 		termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+		scroll_text_buffer()
 		display_text_buffer()
 		display_status_bar()
+		termbox.SetCursor(current_col-offset_col, current_row-offset_row)
 		termbox.Flush()
-		event := termbox.PollEvent()
-		if event.Type == termbox.EventKey && event.Key == termbox.KeyEsc {
-			termbox.Close()
-			break
-		}
+		process_keypress()
 	}
 }
 
