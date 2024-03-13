@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 
@@ -10,10 +11,38 @@ import (
 
 var ROWS, COLS int
 var offsetX, offsetY int
-
+var source_file string
 var text_buffer = [][]rune{
-	{'m', 'o', 'n', 'k', 'e', 'y'},
-	{'e', 'd', 'i', 't', 'o', 'r'},
+	// {'m', 'o', 'n', 'k', 'e', 'y'},
+	// {'e', 'd', 'i', 't', 'o', 'r'},
+}
+
+func read_file(filename string) {
+	file, err := os.Open(filename)
+
+	if err != nil {
+		source_file = filename
+		text_buffer = append(text_buffer, []rune{})
+		return
+	}
+
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	lineNumber := 0
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		text_buffer = append(text_buffer, []rune{})
+
+		for i := 0; i < len(line); i++ {
+			text_buffer[lineNumber] = append(text_buffer[lineNumber], rune(line[i]))
+		}
+		lineNumber++
+	}
+
+	if lineNumber == 0 {
+		text_buffer = append(text_buffer, []rune{})
+	}
 }
 
 func display_text_buffer() {
@@ -50,6 +79,14 @@ func run_editor() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+	if len(os.Args) > 1 {
+		source_file = os.Args[1]
+		read_file(source_file)
+	} else {
+		source_file = "out.txt"
+		text_buffer = append(text_buffer, []rune{})
+	}
+
 	for {
 		// print_message(
 		// 	25,
