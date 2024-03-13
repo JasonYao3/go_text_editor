@@ -1,6 +1,6 @@
 module go_text_editor
 
-go 1.21.6
+go 1.22.0
 
 require (
 	github.com/mattn/go-runewidth v0.0.15 // indirect
