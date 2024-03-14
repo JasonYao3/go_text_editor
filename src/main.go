@@ -87,6 +87,21 @@ func delete_rune() {
 	}
 }
 
+func insert_line() {
+	right_line := make([]rune, len(text_buffer[current_row][current_col:]))
+	copy(right_line, text_buffer[current_row][current_col:])
+	left_line := make([]rune, len(text_buffer[current_row][:current_col]))
+	copy(left_line, text_buffer[current_row][:current_col])
+	text_buffer[current_row] = left_line
+	current_row++
+	current_col = 0
+	new_text_buffer := make([][]rune, len(text_buffer)+1)
+	copy(new_text_buffer, text_buffer[:current_row])
+	new_text_buffer[current_row] = right_line
+	copy(new_text_buffer[current_row+1:], text_buffer[current_row:])
+	text_buffer = new_text_buffer
+}
+
 func scroll_text_buffer() {
 	if current_row < offset_row {
 		offset_row = current_row
@@ -194,6 +209,11 @@ func process_keypress() {
 		}
 	} else {
 		switch key_event.Key {
+		case termbox.KeyEnter:
+			if mode == 1 {
+				insert_line()
+				modified = true
+			}
 		case termbox.KeyBackspace:
 			delete_rune()
 			modified = true
