@@ -51,6 +51,28 @@ func read_file(filename string) {
 	}
 }
 
+func write_file(filename string) {
+	file, err := os.Create(filename)
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer file.Close()
+	writer := bufio.NewWriter(file)
+	for row, line := range text_buffer {
+		new_line := "\n"
+		if row == len(text_buffer)-1 {
+			new_line = ""
+		}
+		write_line := string(line) + new_line
+		_, err = writer.WriteString(write_line)
+		if err != nil {
+			fmt.Println("Error: ", err)
+		}
+		writer.Flush()
+		modified = false
+	}
+}
+
 func insert_rune(event termbox.Event) {
 	insert_rune := make([]rune, len(text_buffer[current_row])+1)
 	copy(insert_rune[:current_col], text_buffer[current_row][:current_col])
@@ -358,6 +380,8 @@ func process_keypress() {
 				os.Exit(0)
 			case 'e':
 				mode = 1
+			case 'w':
+				write_file(source_file)
 			case 'c':
 				copy_line()
 			case 'p':
