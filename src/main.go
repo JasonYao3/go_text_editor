@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 
@@ -159,14 +161,28 @@ func display_status_bar() {
 	} else {
 		file_status += " saved"
 	}
-	cursor_status = " Row " + strconv.Itoa(current_row+1) + ", Col " + strconv.Itoa(current_col+1) + " "
+	cursor_status = " Row " + strconv.Itoa(
+		current_row+1,
+	) + ", Col " + strconv.Itoa(
+		current_col+1,
+	) + " "
 	if len(copy_buffer) > 0 {
 		copy_status = " [Copy]"
 	}
 	if len(undo_buffer) > 0 {
 		undo_status = " [Undo]"
 	}
-	used_space := len(mode_status) + len(file_status) + len(cursor_status) + len(copy_status) + len(undo_status)
+	used_space := len(
+		mode_status,
+	) + len(
+		file_status,
+	) + len(
+		cursor_status,
+	) + len(
+		copy_status,
+	) + len(
+		undo_status,
+	)
 	spaces := strings.Repeat(" ", COLS-used_space)
 	message := mode_status + file_status + copy_status + undo_status + spaces + cursor_status
 	print_message(0, ROWS, termbox.ColorBlack, termbox.ColorWhite, message)
@@ -190,6 +206,97 @@ func get_key() termbox.Event {
 	return key_event
 }
 
+func read_stream(buffer string) {
+	text_buffer = [][]rune{}
+	line_number := 0
+	for _, line := range strings.Split(buffer, "\n") {
+		modified = true
+		text_buffer = append(text_buffer, []rune{})
+		for i := 0; i < len(line); i++ {
+			if line[i] == '\r' {
+				continue
+			}
+			text_buffer[line_number] = append(text_buffer[line_number], rune(line[i]))
+		}
+		line_number++
+	}
+}
+
+func execute_command() {
+	ROWS--
+	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+	display_text_buffer()
+	display_status_bar()
+	termbox.SetCursor(0, ROWS+1)
+	termbox.Flush()
+	command := ""
+command_loop:
+	for {
+		event := get_key()
+		switch event.Key {
+		case termbox.KeyEsc:
+			break command_loop
+		case termbox.KeyEnter:
+			content := ""
+			for _, line := range text_buffer {
+				content += string(line) + "\n"
+			}
+			is_search := false
+			if strings.ContainsRune(command, '=') {
+				is_search = true
+			}
+			cmd := exec.Command("sed", command)
+			if is_search == true {
+				cmd = exec.Command("sed", "-n", command)
+			}
+			cmd.Stdin = bytes.NewBufferString(content)
+			var output bytes.Buffer
+			cmd.Stdout = &output
+			err := cmd.Run()
+			if err != nil {
+				continue
+			}
+			result := output.String()
+			if len(result) > 0 {
+				if is_search == true {
+					current_row, err = strconv.Atoi(
+						strings.TrimSpace(strings.Split(result, "\n")[0]),
+					)
+					current_row--
+					current_col = 0
+					break command_loop
+				}
+				read_stream(result[:len(result)-1])
+			}
+			if current_row > len(text_buffer)-1 {
+				current_row = len(text_buffer) - 1
+			}
+			current_col = 0
+			break command_loop
+		case termbox.KeySpace:
+			command += " "
+		case termbox.KeyBackspace:
+			if len(command) > 0 {
+				command = command[:len(command)-1]
+			}
+		case termbox.KeyBackspace2:
+			if len(command) > 0 {
+				command = command[:len(command)-1]
+			}
+		}
+		if event.Ch != 0 {
+			command += string(event.Ch)
+			print_message(0, ROWS+1, termbox.ColorDefault, termbox.ColorDefault, command)
+		}
+		termbox.SetCursor(len(command), ROWS+1)
+		for i := len(command); i < COLS; i++ {
+			termbox.SetChar(i, ROWS+1, rune(' '))
+		}
+		termbox.Flush()
+	}
+	ROWS++
+}
+
 func process_keypress() {
 	key_event := get_key()
 	if key_event.Key == termbox.KeyEsc {
@@ -205,6 +312,8 @@ func process_keypress() {
 				os.Exit(0)
 			case 'e':
 				mode = 1
+			case 'x':
+				execute_command()
 			}
 		}
 	} else {
