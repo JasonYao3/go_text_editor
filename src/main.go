@@ -284,18 +284,29 @@ func highlight_syntax(col *int, row, text_buffer_col, text_buffer_row int) {
 func display_text_buffer() {
 	var row, col int
 	for row = 0; row < ROWS; row++ {
-		text_bufferRow := row + offset_row
+		text_buffer_row := row + offset_row
 		for col = 0; col < COLS; col++ {
-			text_bufferCol := col + offset_col
-			if text_bufferRow >= 0 && text_bufferRow < len(text_buffer) &&
-				text_bufferCol < len(text_buffer[text_bufferRow]) {
-				if text_buffer[text_bufferRow][text_bufferCol] != '\t' {
-					termbox.SetChar(col, row, text_buffer[text_bufferRow][text_bufferCol])
+			text_buffer_col := col + offset_col
+			if text_buffer_row >= 0 && text_buffer_row < len(text_buffer) &&
+				text_buffer_col < len(text_buffer[text_buffer_row]) {
+				if text_buffer[text_buffer_row][text_buffer_col] != '\t' {
+					if highlight == 1 {
+						highlight_syntax(&col, row, text_buffer_col, text_buffer_row)
+					} else {
+						termbox.SetCell(col, row, text_buffer[text_buffer_row][text_buffer_col],
+							termbox.ColorDefault, termbox.ColorDefault)
+					}
 				} else {
 					termbox.SetCell(col, row, rune(' '), termbox.ColorDefault, termbox.ColorGreen)
 				}
-			} else if row+offset_row > len(text_buffer) {
+			} else if row+offset_row > len(text_buffer)-1 {
 				termbox.SetCell(0, row, rune('*'), termbox.ColorBlue, termbox.ColorDefault)
+			}
+		}
+		if row == current_row-offset_row && highlight == 1 {
+			for col = 0; col < COLS; col++ {
+				current_cell := termbox.GetCell(col, row)
+				termbox.SetCell(col, row, current_cell.Ch, termbox.ColorDefault, termbox.ColorBlue)
 			}
 		}
 		termbox.SetChar(col, row, rune('\n'))
@@ -351,9 +362,9 @@ func display_status_bar() {
 }
 
 func print_message(col, row int, fg, bg termbox.Attribute, message string) {
-	for _, char := range message {
-		termbox.SetCell(col, row, char, fg, bg)
-		col += runewidth.RuneWidth(char)
+	for _, ch := range message {
+		termbox.SetCell(col, row, ch, fg, bg)
+		col += runewidth.RuneWidth(ch)
 	}
 }
 
@@ -421,9 +432,8 @@ command_loop:
 			result := output.String()
 			if len(result) > 0 {
 				if is_search == true {
-					current_row, err = strconv.Atoi(
-						strings.TrimSpace(strings.Split(result, "\n")[0]),
-					)
+					current_row, err = strconv.Atoi(strings.TrimSpace(strings.Split(result, "\n")[0]))
+
 					current_row--
 					current_col = 0
 					break command_loop
@@ -526,7 +536,7 @@ func process_keypress() {
 				current_row -= int(ROWS / 4)
 			}
 		case termbox.KeyPgdn:
-			if current_row+int(ROWS/4) < len(text_buffer)+1 {
+			if current_row+int(ROWS/4) < len(text_buffer)-1 {
 				current_row += int(ROWS / 4)
 			}
 		case termbox.KeyArrowUp:
